@@ -130,4 +130,9 @@ export type SystemEnvType = {
     doc2xKey?: string;
     price?: number; // n points/1 page
   };
+  customEncryption?: {
+    Baseurl?: string;
+    Name?: string;
+    Password?: string;
+  };
 };

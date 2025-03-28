@@ -5,13 +5,17 @@ import { OutLinkChatAuthProps } from '@fastgpt/global/support/permission/chat';
 import { ReadPermissionVal } from '@fastgpt/global/support/permission/constant';
 import { useIPFrequencyLimit } from '@fastgpt/service/common/middle/reqFrequencyLimit';
 import { readFromSecondary } from '@fastgpt/service/common/mongo/utils';
-import { responseWriteController } from '@fastgpt/service/common/response';
+// import { responseWriteController } from '@fastgpt/service/common/response';
 import { addLog } from '@fastgpt/service/common/system/log';
 import { getCollectionWithDataset } from '@fastgpt/service/core/dataset/controller';
 import { MongoDatasetData } from '@fastgpt/service/core/dataset/data/schema';
 import { authDatasetCollection } from '@fastgpt/service/support/permission/dataset/auth';
 import { ApiRequestProps } from '@fastgpt/service/type/next';
 import { NextApiResponse } from 'next';
+import { saveCsvToTemp } from '@/pages/api/common/file/savetotemp';
+import fs from 'fs';
+import { encryptFile } from '@/pages/api/common/file/encryption';
+import { removeFilesByPaths } from '@fastgpt/service/common/file/utils';
 
 export type ExportCollectionBody = {
   collectionId: string;
@@ -90,8 +94,8 @@ async function handler(req: ApiRequestProps<ExportCollectionBody, {}>, res: Next
       : {})
   };
 
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8;');
-  res.setHeader('Content-Disposition', 'attachment; filename=data.csv; ');
+  // res.setHeader('Content-Type', 'text/csv; charset=utf-8;');
+  // res.setHeader('Content-Disposition', 'attachment; filename=data.csv; ');
 
   const cursor = MongoDatasetData.find(where, 'q a', {
     ...readFromSecondary,
@@ -101,24 +105,63 @@ async function handler(req: ApiRequestProps<ExportCollectionBody, {}>, res: Next
     .limit(50000)
     .cursor();
 
-  const write = responseWriteController({
-    res,
-    readStream: cursor
+  // const write = responseWriteController({
+  //   res,
+  //   readStream: cursor
+  // });
+
+  // write(`\uFEFFindex,content`);
+
+  // cursor.on('data', (doc) => {
+  //   const q = doc.q.replace(/"/g, '""') || '';
+  //   const a = doc.a.replace(/"/g, '""') || '';
+  //   write(`\n"${q}","${a}"`);
+  // });
+
+  const csvFilePath = await saveCsvToTemp('index,content', async (writeToFile) => {
+    cursor.on('data', (doc) => {
+      const q = doc.q.replace(/"/g, '""') || '';
+      const a = doc.a.replace(/"/g, '""') || '';
+      const csvLine = `\n"${q}","${a}"`;
+      writeToFile(csvLine);
+    });
+
+    await new Promise((resolve) => {
+      cursor.on('end', resolve);
+      cursor.on('error', resolve);
+    });
   });
 
-  write(`\uFEFFindex,content`);
+  const encryptionSuccess = await encryptFile(csvFilePath);
+  if (!encryptionSuccess) {
+    removeFilesByPaths([csvFilePath]);
+    throw new Error('encryptFile failed');
+  }
 
-  cursor.on('data', (doc) => {
-    const q = doc.q.replace(/"/g, '""') || '';
-    const a = doc.a.replace(/"/g, '""') || '';
+  res.setHeader('Content-Type', `application/octet-stream; charset=utf-8`);
+  res.setHeader('Cache-Control', 'public, max-age=31536000');
+  res.setHeader('Content-Disposition', `attachment; filename="dataqwe.csv"`);
 
-    write(`\n"${q}","${a}"`);
-  });
+  try {
+    const fileStream = fs.createReadStream(csvFilePath);
 
-  cursor.on('end', () => {
+    fileStream.pipe(res);
+
+    fileStream.on('end', () => {
+      cursor.close();
+      fs.unlink(csvFilePath, (err) => {
+        if (err) {
+          addLog.error('Failed to delete temp CSV file', err);
+          removeFilesByPaths([csvFilePath]);
+        }
+      });
+    });
+  } catch (err) {
     cursor.close();
+    addLog.error(`export usage error`, err);
+    res.status(500);
     res.end();
-  });
+  }
 
   cursor.on('error', (err) => {
     addLog.error(`export usage error`, err);
