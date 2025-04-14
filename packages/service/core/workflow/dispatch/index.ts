@@ -44,14 +44,14 @@ import {
   textAdaptGptResponse,
   replaceEditorVariable
 } from '@fastgpt/global/core/workflow/runtime/utils';
-import { ChatNodeUsageType } from '@fastgpt/global/support/wallet/bill/type';
+import type { ChatNodeUsageType } from '@fastgpt/global/support/wallet/bill/type';
 import { dispatchRunTools } from './agent/runTool/index';
 import { ChatItemValueTypeEnum } from '@fastgpt/global/core/chat/constants';
-import { DispatchFlowResponse } from './type';
+import type { DispatchFlowResponse } from './type';
 import { dispatchStopToolCall } from './agent/runTool/stopTool';
 import { dispatchLafRequest } from './tools/runLaf';
 import { dispatchIfElse } from './tools/runIfElse';
-import { RuntimeEdgeItemType } from '@fastgpt/global/core/workflow/type/edge';
+import type { RuntimeEdgeItemType } from '@fastgpt/global/core/workflow/type/edge';
 import { getReferenceVariableValue } from '@fastgpt/global/core/workflow/runtime/utils';
 import { dispatchSystemConfig } from './init/systemConfig';
 import { dispatchUpdateVariable } from './tools/runUpdateVar';
@@ -62,7 +62,7 @@ import { dispatchTextEditor } from './tools/textEditor';
 import { dispatchCustomFeedback } from './tools/customFeedback';
 import { dispatchReadFiles } from './tools/readFiles';
 import { dispatchUserSelect } from './interactive/userSelect';
-import {
+import type {
   WorkflowInteractiveResponseType,
   InteractiveNodeResponseType
 } from '@fastgpt/global/core/workflow/template/system/interactive/type';
@@ -73,6 +73,7 @@ import { dispatchLoopStart } from './loop/runLoopStart';
 import { dispatchFormInput } from './interactive/formInput';
 import { dispatchToolParams } from './agent/runTool/toolParams';
 import { getErrText } from '@fastgpt/global/common/error/utils';
+import { filterModuleTypeList } from '@fastgpt/global/core/chat/utils';
 
 const callbackMap: Record<FlowNodeTypeEnum, Function> = {
   [FlowNodeTypeEnum.workflowStart]: dispatchWorkflowStart,
@@ -130,6 +131,7 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
     timezone,
     externalProvider,
     stream = false,
+    version = 'v1',
     ...props
   } = data;
 
@@ -139,6 +141,7 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
   } else {
     props.workflowDispatchDeep += 1;
   }
+  const isRootRuntime = props.workflowDispatchDeep === 1;
 
   if (props.workflowDispatchDeep > 20) {
     return {
@@ -159,25 +162,28 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
   let workflowRunTimes = 0;
 
   // set sse response headers
-  if (stream && res) {
-    res.setHeader('Content-Type', 'text/event-stream;charset=utf-8');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('X-Accel-Buffering', 'no');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
+  if (isRootRuntime) {
+    res?.setHeader('Connection', 'keep-alive'); // Set keepalive for long connection
+    if (stream && res) {
+      res.setHeader('Content-Type', 'text/event-stream;charset=utf-8');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
 
-    // 10s sends a message to prevent the browser from thinking that the connection is disconnected
-    const sendStreamTimerSign = () => {
-      setTimeout(() => {
-        props?.workflowStreamResponse?.({
-          event: SseResponseEventEnum.answer,
-          data: textAdaptGptResponse({
-            text: ''
-          })
-        });
-        sendStreamTimerSign();
-      }, 10000);
-    };
-    sendStreamTimerSign();
+      // 10s sends a message to prevent the browser from thinking that the connection is disconnected
+      const sendStreamTimerSign = () => {
+        setTimeout(() => {
+          props?.workflowStreamResponse?.({
+            event: SseResponseEventEnum.answer,
+            data: textAdaptGptResponse({
+              text: ''
+            })
+          });
+          sendStreamTimerSign();
+        }, 10000);
+      };
+      sendStreamTimerSign();
+    }
   }
 
   variables = {
@@ -323,10 +329,9 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
     });
 
     if (props.mode === 'debug') {
-      debugNextStepRunNodes = debugNextStepRunNodes.concat([
-        ...nextStepActiveNodes,
-        ...nextStepSkipNodes
-      ]);
+      debugNextStepRunNodes = debugNextStepRunNodes.concat(
+        props.lastInteractive ? nextStepActiveNodes : [...nextStepActiveNodes, ...nextStepSkipNodes]
+      );
       return {
         nextStepActiveNodes: [],
         nextStepSkipNodes: []
@@ -372,7 +377,7 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
     };
 
     // Tool call, not need interactive response
-    if (!props.isToolCall) {
+    if (!props.isToolCall && isRootRuntime) {
       props.workflowStreamResponse?.({
         event: SseResponseEventEnum.interactive,
         data: { interactive: interactiveResult }
@@ -426,14 +431,6 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
     })();
 
     if (!nodeRunResult) return [];
-    if (res?.closed) {
-      addLog.warn('Request is closed', {
-        appId: props.runningAppInfo.id,
-        nodeId: node.nodeId,
-        nodeName: node.name
-      });
-      return [];
-    }
 
     /* 
       特殊情况：
@@ -451,6 +448,11 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
     const interactiveResponse = nodeRunResult.result?.[DispatchNodeResponseKeyEnum.interactive];
     if (interactiveResponse) {
       pushStore(nodeRunResult.node, nodeRunResult.result);
+
+      if (props.mode === 'debug') {
+        debugNextStepRunNodes = debugNextStepRunNodes.concat([nodeRunResult.node]);
+      }
+
       nodeInteractiveResponse = {
         entryNodeIds: [nodeRunResult.node.nodeId],
         interactiveResponse
@@ -484,6 +486,15 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
     const nextStepSkipNodesResults = (
       await Promise.all(nextStepSkipNodes.map((node) => checkNodeCanRun(node, skippedNodeIdList)))
     ).flat();
+
+    if (res?.closed) {
+      addLog.warn('Request is closed', {
+        appId: props.runningAppInfo.id,
+        nodeId: node.nodeId,
+        nodeName: node.name
+      });
+      return [];
+    }
 
     return [
       ...nextStepActiveNodes,
@@ -621,6 +632,22 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
       };
     })();
 
+    // Response node response
+    if (
+      version === 'v2' &&
+      !props.isToolCall &&
+      isRootRuntime &&
+      formatResponseData &&
+      !(!props.responseDetail && filterModuleTypeList.includes(formatResponseData.moduleType))
+    ) {
+      props.workflowStreamResponse?.({
+        event: SseResponseEventEnum.flowNodeResponse,
+        data: {
+          ...formatResponseData
+        }
+      });
+    }
+
     // Add output default value
     node.outputs.forEach((item) => {
       if (!item.required) return;
@@ -698,7 +725,9 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
           entryNodeIds: nodeInteractiveResponse.entryNodeIds,
           interactiveResponse: nodeInteractiveResponse.interactiveResponse
         });
-        chatAssistantResponse.push(interactiveAssistant);
+        if (isRootRuntime) {
+          chatAssistantResponse.push(interactiveAssistant);
+        }
         return interactiveAssistant.interactive;
       }
     })();

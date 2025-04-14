@@ -35,6 +35,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse<any>) {
   const filePaths: string[] = [];
   try {
     const start = Date.now();
+    /* Creates the multer uploader */
     const upload = getUploadModel({
       maxSize: global.feConfigs?.uploadFileMaxSize
     });

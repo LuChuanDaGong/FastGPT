@@ -11,7 +11,7 @@ import type { AIChatItemType, UserChatItemType } from '@fastgpt/global/core/chat
 import { authApp } from '@fastgpt/service/support/permission/app/auth';
 import { dispatchWorkFlow } from '@fastgpt/service/core/workflow/dispatch';
 import { getUserChatInfoAndAuthTeamPoints } from '@fastgpt/service/support/permission/auth/team';
-import { StoreEdgeItemType } from '@fastgpt/global/core/workflow/type/edge';
+import type { StoreEdgeItemType } from '@fastgpt/global/core/workflow/type/edge';
 import {
   concatHistories,
   getChatTitleFromChatMessage,
@@ -25,8 +25,8 @@ import {
 } from '@fastgpt/global/core/workflow/utils';
 import { NextAPI } from '@/service/middleware/entry';
 import { chatValue2RuntimePrompt, GPTMessages2Chats } from '@fastgpt/global/core/chat/adapt';
-import { ChatCompletionMessageParam } from '@fastgpt/global/core/ai/type';
-import { AppChatConfigType } from '@fastgpt/global/core/app/type';
+import type { ChatCompletionMessageParam } from '@fastgpt/global/core/ai/type';
+import type { AppChatConfigType } from '@fastgpt/global/core/app/type';
 import {
   getLastInteractiveValue,
   getMaxHistoryLimitFromNodes,
@@ -36,7 +36,7 @@ import {
   storeNodes2RuntimeNodes,
   textAdaptGptResponse
 } from '@fastgpt/global/core/workflow/runtime/utils';
-import { StoreNodeItemType } from '@fastgpt/global/core/workflow/type/node';
+import type { StoreNodeItemType } from '@fastgpt/global/core/workflow/type/node';
 import { getWorkflowResponseWrite } from '@fastgpt/service/core/workflow/dispatch/utils';
 import { WORKFLOW_MAX_RUN_TIMES } from '@fastgpt/service/core/workflow/constants';
 import { getPluginInputsFromStoreNodes } from '@fastgpt/global/core/app/plugin/utils';
@@ -98,7 +98,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
 
     const isPlugin = app.type === AppTypeEnum.plugin;
 
-    const userQuestion: UserChatItemType = (() => {
+    const userQuestion: UserChatItemType = await (async () => {
       if (isPlugin) {
         return getPluginRunUserQuery({
           pluginInputs: getPluginInputsFromStoreNodes(app.modules),
@@ -107,9 +107,9 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         });
       }
 
-      const latestHumanChat = chatMessages.pop() as UserChatItemType | undefined;
+      const latestHumanChat = chatMessages.pop() as UserChatItemType;
       if (!latestHumanChat) {
-        throw new Error('User question is empty');
+        return Promise.reject('User question is empty');
       }
       return latestHumanChat;
     })();
@@ -136,14 +136,14 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     }
 
     const newHistories = concatHistories(histories, chatMessages);
-
+    const interactive = getLastInteractiveValue(newHistories) || undefined;
     // Get runtimeNodes
-    let runtimeNodes = storeNodes2RuntimeNodes(nodes, getWorkflowEntryNodeIds(nodes, newHistories));
+    let runtimeNodes = storeNodes2RuntimeNodes(nodes, getWorkflowEntryNodeIds(nodes, interactive));
     if (isPlugin) {
       runtimeNodes = updatePluginInputByVariables(runtimeNodes, variables);
       variables = {};
     }
-    runtimeNodes = rewriteNodeOutputByHistories(newHistories, runtimeNodes);
+    runtimeNodes = rewriteNodeOutputByHistories(runtimeNodes, interactive);
 
     const workflowResponseWrite = getWorkflowResponseWrite({
       res,
@@ -175,14 +175,16 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       chatId,
       responseChatItemId,
       runtimeNodes,
-      runtimeEdges: initWorkflowEdgeStatus(edges, newHistories),
+      runtimeEdges: initWorkflowEdgeStatus(edges, interactive),
       variables,
       query: removeEmptyUserInput(userQuestion.value),
+      lastInteractive: interactive,
       chatConfig,
       histories: newHistories,
       stream: true,
       maxRunTimes: WORKFLOW_MAX_RUN_TIMES,
-      workflowStreamResponse: workflowResponseWrite
+      workflowStreamResponse: workflowResponseWrite,
+      version: 'v2'
     });
 
     workflowResponseWrite({
@@ -196,11 +198,6 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
       res,
       event: SseResponseEventEnum.answer,
       data: '[DONE]'
-    });
-    responseWrite({
-      res,
-      event: SseResponseEventEnum.flowResponses,
-      data: JSON.stringify(flowResponses)
     });
 
     // save chat
