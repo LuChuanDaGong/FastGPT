@@ -118,12 +118,16 @@ export type SystemEnvType = {
   oneapiUrl?: string;
   chatApiKey?: string;
 
-  customPdfParse?: customPdfParseType;
-};
+  customPdfParse?: {
+    url?: string;
+    key?: string;
 
-export type customPdfParseType = {
-  url?: string;
-  key?: string;
-  doc2xKey?: string;
-  price?: number;
+    doc2xKey?: string;
+    price?: number; // n points/1 page
+  };
+  customEncryption?: {
+    Baseurl?: string;
+    Name?: string;
+    Password?: string;
+  };
 };

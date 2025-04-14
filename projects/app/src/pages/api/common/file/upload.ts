@@ -13,6 +13,7 @@ import { authChatCrud } from '@/service/support/permission/auth/chat';
 import { authDataset } from '@fastgpt/service/support/permission/dataset/auth';
 import { OutLinkChatAuthProps } from '@fastgpt/global/support/permission/chat';
 import { WritePermissionVal } from '@fastgpt/global/support/permission/constant';
+import { decryptFile } from './encryption';
 
 export type UploadChatFileProps = {
   appId: string;
@@ -75,6 +76,12 @@ async function handler(req: NextApiRequest, res: NextApiResponse<any>) {
     })();
 
     await authUploadLimit(uid);
+
+    // 解密文件
+    const decryptionSuccess = await decryptFile(file.path);
+    if (!decryptionSuccess) {
+      throw new Error('decryptFile failed');
+    }
 
     addLog.info(`Upload file success ${file.originalname}, cost ${Date.now() - start}ms`);
 

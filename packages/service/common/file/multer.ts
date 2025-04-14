@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'path';
 import { BucketNameEnum, bucketNameMap } from '@fastgpt/global/common/file/constants';
 import { getNanoid } from '@fastgpt/global/common/string/tools';
+import fs from 'fs';
 
 export type FileType = {
   fieldname: string;
@@ -15,11 +16,15 @@ export type FileType = {
 };
 
 /* 
-  maxSize: File max size (MB)
+  maxSize: 文件最大大小 (MB)
 */
 export const getUploadModel = ({ maxSize = 500 }: { maxSize?: number }) => {
   maxSize *= 1024 * 1024;
-
+  const tempDir = '/app/data/fastgptTempfiles/upload/';
+  // 检查临时目录是否存在，如果不存在则创建
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
   class UploadModel {
     uploader = multer({
       limits: {
@@ -27,9 +32,10 @@ export const getUploadModel = ({ maxSize = 500 }: { maxSize?: number }) => {
       },
       preservePath: true,
       storage: multer.diskStorage({
-        // destination: (_req, _file, cb) => {
-        //   cb(null, tmpFileDirPath);
-        // },
+        destination: (_req, _file, cb) => {
+          cb(null, tempDir);
+          //   cb(null, tmpFileDirPath);
+        },
         filename: (req, file, cb) => {
           if (!file?.originalname) {
             cb(new Error('File not found'), '');
@@ -58,7 +64,7 @@ export const getUploadModel = ({ maxSize = 500 }: { maxSize?: number }) => {
             return reject(error);
           }
 
-          // check bucket name
+          // 检查 bucket 名称
           const bucketName = (req.body?.bucketName || originBucketName) as `${BucketNameEnum}`;
           if (bucketName && !bucketNameMap[bucketName]) {
             return reject('BucketName is invalid');
