@@ -1,3 +1,4 @@
+// @ts-ignore
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { jsonRes } from '@fastgpt/service/common/response';
 import { uploadFile } from '@fastgpt/service/common/file/gridfs/controller';
