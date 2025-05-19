@@ -31,6 +31,7 @@ import { TabEnum } from './NavBar';
 import { ImportDataSourceEnum } from '@fastgpt/global/core/dataset/constants';
 import { useRequest2 } from '@fastgpt/web/hooks/useRequest';
 import TrainingStates from './CollectionCard/TrainingStates';
+import { getTextValidLength } from '@fastgpt/global/common/string/utils';
 
 const DataCard = () => {
   const theme = useTheme();
@@ -101,7 +102,7 @@ const DataCard = () => {
           return prev.filter((data) => data._id !== dataId);
         });
         toast({
-          title: t('common:common.Delete Success'),
+          title: t('common:delete_success'),
           status: 'success'
         });
       } catch (error) {
@@ -139,25 +140,27 @@ const DataCard = () => {
               <TagsPopOver currentCollection={collection} />
             )}
           </Box>
-          {datasetDetail.type !== 'websiteDataset' && !!collection?.chunkSize && (
-            <Button
-              ml={2}
-              variant={'whitePrimary'}
-              size={['sm', 'md']}
-              onClick={() => {
-                router.push({
-                  query: {
-                    datasetId,
-                    currentTab: TabEnum.import,
-                    source: ImportDataSourceEnum.reTraining,
-                    collectionId
-                  }
-                });
-              }}
-            >
-              {t('dataset:retain_collection')}
-            </Button>
-          )}
+          {datasetDetail.type !== 'websiteDataset' &&
+            !!collection?.chunkSize &&
+            collection.permission?.hasWritePer && (
+              <Button
+                ml={2}
+                variant={'whitePrimary'}
+                size={['sm', 'md']}
+                onClick={() => {
+                  router.push({
+                    query: {
+                      datasetId,
+                      currentTab: TabEnum.import,
+                      source: ImportDataSourceEnum.reTraining,
+                      collectionId
+                    }
+                  });
+                }}
+              >
+                {t('dataset:retain_collection')}
+              </Button>
+            )}
           {canWrite && (
             <Button
               ml={2}
@@ -327,7 +330,7 @@ const DataCard = () => {
                       w={'14px'}
                       mr={1}
                     />
-                    {item.q.length + (item.a?.length || 0)}
+                    {getTextValidLength(item.q + item.a || '')}
                   </Flex>
                   {canWrite && (
                     <IconButton

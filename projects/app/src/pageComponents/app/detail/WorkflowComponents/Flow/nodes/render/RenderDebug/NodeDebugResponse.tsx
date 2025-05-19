@@ -12,12 +12,12 @@ import {
   FormInputComponent,
   SelectOptionsComponent
 } from '@/components/core/chat/components/Interactive/InteractiveComponents';
-import { UserInputInteractive } from '@fastgpt/global/core/workflow/template/system/interactive/type';
+import { type UserInputInteractive } from '@fastgpt/global/core/workflow/template/system/interactive/type';
 import {
   getLastInteractiveValue,
-  initWorkflowEdgeStatus
+  storeEdges2RuntimeEdges
 } from '@fastgpt/global/core/workflow/runtime/utils';
-import { ChatItemType, UserChatItemValueItemType } from '@fastgpt/global/core/chat/type';
+import { type ChatItemType, type UserChatItemValueItemType } from '@fastgpt/global/core/chat/type';
 import { ChatItemValueTypeEnum, ChatRoleEnum } from '@fastgpt/global/core/chat/constants';
 
 type NodeDebugResponseProps = {
@@ -55,7 +55,7 @@ const RenderUserFormInteractive = React.memo(function RenderFormInput({
               })()
             }
           >
-            {t('common:common.Next Step')}
+            {t('common:next_step')}
           </Button>
         )}
       />
@@ -137,7 +137,7 @@ const NodeDebugResponse = ({ nodeId, debugResult }: NodeDebugResponseProps) => {
       onNextNodeDebug({
         ...workflowDebugData,
         // Rewrite runtimeEdges
-        runtimeEdges: initWorkflowEdgeStatus(workflowDebugData.runtimeEdges, lastInteractive),
+        runtimeEdges: storeEdges2RuntimeEdges(workflowDebugData.runtimeEdges, lastInteractive),
         query: updatedQuery,
         history: mockHistory
       });
@@ -218,7 +218,7 @@ const NodeDebugResponse = ({ nodeId, debugResult }: NodeDebugResponseProps) => {
                       variant={'primary'}
                       onClick={() => onNextNodeDebug(workflowDebugData)}
                     >
-                      {t('common:common.Next Step')}
+                      {t('common:next_step')}
                     </Button>
                   )}
                 {workflowDebugData?.nextRunNodes &&

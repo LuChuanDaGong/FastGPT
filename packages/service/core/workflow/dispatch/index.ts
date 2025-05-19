@@ -3,7 +3,7 @@ import {
   DispatchNodeResponseKeyEnum,
   SseResponseEventEnum
 } from '@fastgpt/global/core/workflow/runtime/constants';
-import { NodeOutputKeyEnum } from '@fastgpt/global/core/workflow/constants';
+import type { NodeOutputKeyEnum } from '@fastgpt/global/core/workflow/constants';
 import type {
   ChatDispatchProps,
   DispatchNodeResultType,
@@ -11,6 +11,7 @@ import type {
   SystemVariablesType
 } from '@fastgpt/global/core/workflow/runtime/type';
 import type { RuntimeNodeItemType } from '@fastgpt/global/core/workflow/runtime/type.d';
+import type { FlowNodeOutputItemType } from '@fastgpt/global/core/workflow/type/io.d';
 import type {
   AIChatItemValueItemType,
   ChatHistoryItemResType,
@@ -37,7 +38,8 @@ import { dispatchQueryExtension } from './tools/queryExternsion';
 import { dispatchRunPlugin } from './plugin/run';
 import { dispatchPluginInput } from './plugin/runInput';
 import { dispatchPluginOutput } from './plugin/runOutput';
-import { formatHttpError, removeSystemVariable, valueTypeFormat } from './utils';
+import { formatHttpError, removeSystemVariable, rewriteRuntimeWorkFlow } from './utils';
+import { valueTypeFormat } from '@fastgpt/global/core/workflow/runtime/utils';
 import {
   filterWorkflowEdges,
   checkNodeRunStatus,
@@ -73,7 +75,8 @@ import { dispatchLoopStart } from './loop/runLoopStart';
 import { dispatchFormInput } from './interactive/formInput';
 import { dispatchToolParams } from './agent/runTool/toolParams';
 import { getErrText } from '@fastgpt/global/common/error/utils';
-import { filterModuleTypeList } from '@fastgpt/global/core/chat/utils';
+import { filterPublicNodeResponseData } from '@fastgpt/global/core/chat/utils';
+import { dispatchRunTool } from './plugin/runTool';
 
 const callbackMap: Record<FlowNodeTypeEnum, Function> = {
   [FlowNodeTypeEnum.workflowStart]: dispatchWorkflowStart,
@@ -104,6 +107,7 @@ const callbackMap: Record<FlowNodeTypeEnum, Function> = {
   [FlowNodeTypeEnum.loopStart]: dispatchLoopStart,
   [FlowNodeTypeEnum.loopEnd]: dispatchLoopEnd,
   [FlowNodeTypeEnum.formInput]: dispatchFormInput,
+  [FlowNodeTypeEnum.tool]: dispatchRunTool,
 
   // none
   [FlowNodeTypeEnum.systemConfig]: dispatchSystemConfig,
@@ -111,6 +115,7 @@ const callbackMap: Record<FlowNodeTypeEnum, Function> = {
   [FlowNodeTypeEnum.emptyNode]: () => Promise.resolve(),
   [FlowNodeTypeEnum.globalVariable]: () => Promise.resolve(),
   [FlowNodeTypeEnum.comment]: () => Promise.resolve(),
+  [FlowNodeTypeEnum.toolSet]: () => Promise.resolve(),
 
   [FlowNodeTypeEnum.runApp]: dispatchAppRequest // abandoned
 };
@@ -131,10 +136,15 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
     timezone,
     externalProvider,
     stream = false,
+    retainDatasetCite = true,
     version = 'v1',
     responseDetail = true,
+    responseAllData = true,
     ...props
   } = data;
+  const startTime = Date.now();
+
+  rewriteRuntimeWorkFlow(runtimeNodes, runtimeEdges);
 
   // 初始化深度和自动增加深度，避免无限嵌套
   if (!props.workflowDispatchDeep) {
@@ -156,16 +166,24 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
       [DispatchNodeResponseKeyEnum.runTimes]: 1,
       [DispatchNodeResponseKeyEnum.assistantResponses]: [],
       [DispatchNodeResponseKeyEnum.toolResponses]: null,
-      newVariables: removeSystemVariable(variables, externalProvider.externalWorkflowVariables)
+      newVariables: removeSystemVariable(variables, externalProvider.externalWorkflowVariables),
+      durationSeconds: 0
     };
   }
 
   let workflowRunTimes = 0;
 
-  // set sse response headers
+  // Init
   if (isRootRuntime) {
+    // set sse response headers
     res?.setHeader('Connection', 'keep-alive'); // Set keepalive for long connection
     if (stream && res) {
+      res.on('close', () => res.end());
+      res.on('error', () => {
+        addLog.error('Request error');
+        res.end();
+      });
+
       res.setHeader('Content-Type', 'text/event-stream;charset=utf-8');
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('X-Accel-Buffering', 'no');
@@ -185,13 +203,14 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
       };
       sendStreamTimerSign();
     }
-  }
 
-  variables = {
-    ...getSystemVariable(data),
-    ...externalProvider.externalWorkflowVariables,
-    ...variables
-  };
+    // Add system variables
+    variables = {
+      ...getSystemVariable(data),
+      ...externalProvider.externalWorkflowVariables,
+      ...variables
+    };
+  }
 
   let chatResponses: ChatHistoryItemResType[] = []; // response request and save to database
   let chatAssistantResponse: AIChatItemValueItemType[] = []; // The value will be returned to the user
@@ -531,7 +550,7 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
       // Skip some special key
       if (
         [NodeInputKeyEnum.childrenNodeIdList, NodeInputKeyEnum.httpJsonBody].includes(
-          input.key as any
+          input.key as NodeInputKeyEnum
         )
       ) {
         params[input.key] = input.value;
@@ -589,6 +608,7 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
       timezone,
       externalProvider,
       stream,
+      retainDatasetCite,
       node,
       runtimeNodes,
       runtimeEdges,
@@ -634,18 +654,15 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
     })();
 
     // Response node response
-    if (
-      version === 'v2' &&
-      !props.isToolCall &&
-      isRootRuntime &&
-      formatResponseData &&
-      !(responseDetail === false && filterModuleTypeList.includes(formatResponseData.moduleType))
-    ) {
+    if (version === 'v2' && !props.isToolCall && isRootRuntime && formatResponseData) {
       props.workflowStreamResponse?.({
         event: SseResponseEventEnum.flowNodeResponse,
-        data: {
-          ...formatResponseData
-        }
+        data: responseAllData
+          ? formatResponseData
+          : filterPublicNodeResponseData({
+              flowResponses: [formatResponseData],
+              responseDetail
+            })[0]
       });
     }
 
@@ -733,6 +750,15 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
       }
     })();
 
+    const durationSeconds = +((Date.now() - startTime) / 1000).toFixed(2);
+
+    if (isRootRuntime && stream) {
+      props.workflowStreamResponse?.({
+        event: SseResponseEventEnum.workflowDuration,
+        data: { durationSeconds }
+      });
+    }
+
     return {
       flowResponses: chatResponses,
       flowUsages: chatNodeUsages,
@@ -746,7 +772,8 @@ export async function dispatchWorkFlow(data: Props): Promise<DispatchFlowRespons
       [DispatchNodeResponseKeyEnum.assistantResponses]:
         mergeAssistantResponseAnswerText(chatAssistantResponse),
       [DispatchNodeResponseKeyEnum.toolResponses]: toolRunResponse,
-      newVariables: removeSystemVariable(variables, externalProvider.externalWorkflowVariables)
+      newVariables: removeSystemVariable(variables, externalProvider.externalWorkflowVariables),
+      durationSeconds
     };
   } catch (error) {
     return Promise.reject(error);

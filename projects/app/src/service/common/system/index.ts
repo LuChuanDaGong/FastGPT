@@ -13,16 +13,22 @@ import { MongoTemplateTypes } from '@fastgpt/service/core/app/templates/template
 import { loadSystemModels } from '@fastgpt/service/core/ai/config/utils';
 import { POST } from '@fastgpt/service/common/api/plusRequest';
 import {
-  DeepRagSearchProps,
-  SearchDatasetDataResponse
+  type DeepRagSearchProps,
+  type SearchDatasetDataResponse
 } from '@fastgpt/service/core/dataset/search/controller';
-import { AuthOpenApiLimitProps } from '@fastgpt/service/support/openapi/auth';
-import { ConcatUsageProps, CreateUsageProps } from '@fastgpt/global/support/wallet/usage/api';
+import { type AuthOpenApiLimitProps } from '@fastgpt/service/support/openapi/auth';
+import {
+  type ConcatUsageProps,
+  type CreateUsageProps
+} from '@fastgpt/global/support/wallet/usage/api';
 import {
   getProApiDatasetFileContentRequest,
+  getProApiDatasetFileDetailRequest,
   getProApiDatasetFileListRequest,
   getProApiDatasetFilePreviewUrlRequest
 } from '@/service/core/dataset/apiDataset/controller';
+import { isProVersion } from './constants';
+import { preLoadWorker } from '@fastgpt/service/worker/preload';
 
 export const readConfigData = async (name: string) => {
   const splitName = name.split('.');
@@ -37,8 +43,9 @@ export const readConfigData = async (name: string) => {
       }
       return `data/${name}`;
     }
-    // production path
-    return `/app/data/${name}`;
+    // Fallback to default production path
+    const envPath = process.env.CONFIG_JSON_PATH || '/app/data';
+    return `${envPath}/${name}`;
   })();
 
   const content = await fs.promises.readFile(filename, 'utf-8');
@@ -50,6 +57,7 @@ export const readConfigData = async (name: string) => {
 export function initGlobalVariables() {
   function initPlusRequest() {
     global.textCensorHandler = function textCensorHandler({ text }: { text: string }) {
+      if (!isProVersion()) return Promise.resolve({ code: 200 });
       return POST<{ code: number; message?: string }>('/common/censor/check', { text });
     };
 
@@ -58,20 +66,24 @@ export function initGlobalVariables() {
     };
 
     global.authOpenApiHandler = function authOpenApiHandler(data: AuthOpenApiLimitProps) {
+      if (!isProVersion()) return Promise.resolve();
       return POST<AuthOpenApiLimitProps>('/support/openapi/authLimit', data);
     };
 
     global.createUsageHandler = function createUsageHandler(data: CreateUsageProps) {
+      if (!isProVersion()) return;
       return POST('/support/wallet/usage/createUsage', data);
     };
 
     global.concatUsageHandler = function concatUsageHandler(data: ConcatUsageProps) {
+      if (!isProVersion()) return;
       return POST('/support/wallet/usage/concatUsage', data);
     };
 
     global.getProApiDatasetFileList = getProApiDatasetFileListRequest;
     global.getProApiDatasetFileContent = getProApiDatasetFileContentRequest;
     global.getProApiDatasetFilePreviewUrl = getProApiDatasetFilePreviewUrlRequest;
+    global.getProApiDatasetFileDetail = getProApiDatasetFileDetailRequest;
   }
 
   global.communityPlugins = [];
@@ -83,7 +95,12 @@ export function initGlobalVariables() {
 
 /* Init system data(Need to connected db). It only needs to run once */
 export async function getInitConfig() {
-  return Promise.all([initSystemConfig(), getSystemVersion(), loadSystemModels()]);
+  await Promise.all([initSystemConfig(), getSystemVersion(), loadSystemModels()]);
+  try {
+    await preLoadWorker();
+  } catch (error) {
+    console.error('Preload worker error', error);
+  }
 }
 
 const defaultFeConfigs: FastGPTFeConfigsType = {
@@ -121,7 +138,8 @@ export async function initSystemConfig() {
       ...defaultFeConfigs,
       ...(dbConfig.feConfigs || {}),
       isPlus: !!FastGPTProUrl,
-      show_aiproxy: !!process.env.AIPROXY_API_ENDPOINT
+      show_aiproxy: !!process.env.AIPROXY_API_ENDPOINT,
+      show_coupon: process.env.SHOW_COUPON === 'true'
     },
     systemEnv: {
       ...fileRes.systemEnv,

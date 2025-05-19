@@ -12,10 +12,11 @@ export default defineConfig({
     outputFile: 'test-results.json',
     setupFiles: 'test/setup.ts',
     globalSetup: 'test/globalSetup.ts',
-    fileParallelism: false,
+    // fileParallelism: false,
+    maxConcurrency: 5,
     pool: 'threads',
     include: ['test/test.ts', 'test/cases/**/*.test.ts', 'projects/app/test/**/*.test.ts'],
-    testTimeout: 5000,
+    testTimeout: 20000,
     reporters: ['github-actions', 'default']
   },
   resolve: {

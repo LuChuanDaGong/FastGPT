@@ -11,6 +11,13 @@ import { serviceSideProps } from '@/web/common/i18n/utils';
 import { getErrText } from '@fastgpt/global/common/error/utils';
 import { useTranslation } from 'next-i18next';
 import { OAuthEnum } from '@fastgpt/global/support/user/constant';
+import {
+  getBdVId,
+  getFastGPTSem,
+  getInviterId,
+  getSourceDomain,
+  removeFastGPTSem
+} from '@/web/support/marketing/utils';
 
 let isOauthLogging = false;
 
@@ -26,7 +33,9 @@ const provider = () => {
     (res: ResLogin) => {
       setUserInfo(res.user);
 
-      router.push(loginStore?.lastRoute ? decodeURIComponent(loginStore?.lastRoute) : '/app/list');
+      router.push(
+        loginStore?.lastRoute ? decodeURIComponent(loginStore?.lastRoute) : '/dashboard/apps'
+      );
     },
     [setUserInfo, router, loginStore?.lastRoute]
   );
@@ -38,18 +47,10 @@ const provider = () => {
           type: loginStore?.provider || OAuthEnum.sso,
           props,
           callbackUrl: `${location.origin}/login/provider`,
-          inviterId: localStorage.getItem('inviterId') || undefined,
-          bd_vid: sessionStorage.getItem('bd_vid') || undefined,
-          fastgpt_sem: (() => {
-            try {
-              return sessionStorage.getItem('fastgpt_sem')
-                ? JSON.parse(sessionStorage.getItem('fastgpt_sem')!)
-                : undefined;
-            } catch {
-              return undefined;
-            }
-          })(),
-          sourceDomain: sessionStorage.getItem('sourceDomain') || undefined
+          inviterId: getInviterId(),
+          bd_vid: getBdVId(),
+          fastgpt_sem: getFastGPTSem(),
+          sourceDomain: getSourceDomain()
         });
 
         if (!res) {
@@ -61,6 +62,8 @@ const provider = () => {
             router.replace('/login');
           }, 1000);
         }
+
+        removeFastGPTSem();
         loginSuccess(res);
       } catch (error) {
         toast({
@@ -95,7 +98,7 @@ const provider = () => {
 
     (async () => {
       await clearToken();
-      router.prefetch('/app/list');
+      router.prefetch('/dashboard/apps');
 
       if (loginStore && loginStore.provider !== 'sso' && state !== loginStore.state) {
         toast({

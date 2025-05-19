@@ -26,7 +26,7 @@ import { getNanoid } from '@fastgpt/global/common/string/tools';
 
 import { GetChatTypeEnum } from '@/global/core/chat/constants';
 import ChatContextProvider, { ChatContext } from '@/web/core/chat/context/chatContext';
-import { AppListItemType } from '@fastgpt/global/core/app/type';
+import { type AppListItemType } from '@fastgpt/global/core/app/type';
 import { useContextSelector } from 'use-context-selector';
 import dynamic from 'next/dynamic';
 import ChatBox from '@/components/core/chat/ChatContainer/ChatBox';
@@ -89,7 +89,7 @@ const Chat = ({ myApps }: { myApps: AppListItemType[] }) => {
         // reset all chat tore
         if (e?.code === 501) {
           setLastChatAppId('');
-          router.replace('/app/list');
+          router.replace('/dashboard/apps');
         } else {
           router.replace({
             query: {
@@ -259,7 +259,7 @@ const Render = (props: { appId: string; isStandalone?: string }) => {
           status: 'error',
           title: t('common:core.chat.You need to a chat app')
         });
-        router.replace('/app/list');
+        router.replace('/dashboard/apps');
       } else {
         router.replace({
           query: {
@@ -294,6 +294,7 @@ const Render = (props: { appId: string; isStandalone?: string }) => {
         showRouteToAppDetail={isStandalone !== '1'}
         showRouteToDatasetDetail={isStandalone !== '1'}
         isShowReadRawSource={true}
+        isResponseDetail={true}
         // isShowFullText={true}
         showNodeStatus
       >

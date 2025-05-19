@@ -1,8 +1,8 @@
 import { Types, connectionMongo, ReadPreference } from '../../mongo';
-import { BucketNameEnum } from '@fastgpt/global/common/file/constants';
+import type { BucketNameEnum } from '@fastgpt/global/common/file/constants';
 import fsp from 'fs/promises';
 import fs from 'fs';
-import { DatasetFileSchema } from '@fastgpt/global/core/dataset/type';
+import { type DatasetFileSchema } from '@fastgpt/global/core/dataset/type';
 import { MongoChatFileSchema, MongoDatasetFileSchema } from './schema';
 import { detectFileEncoding, detectFileEncodingByPath } from '@fastgpt/global/common/file/tools';
 import { CommonErrEnum } from '@fastgpt/global/common/error/code/common';
@@ -65,9 +65,10 @@ export async function uploadFile({
   const bucket = getGridBucket(bucketName);
 
   const fileSize = stats.size;
+  // 单块大小：尽可能大，但不超过 14MB，不小于512KB
   const chunkSizeBytes = (() => {
-    // 计算理想块大小：文件大小 ÷ 目标块数(10)
-    const idealChunkSize = Math.ceil(fileSize / 10);
+    // 计算理想块大小：文件大小 ÷ 目标块数(10)。 并且每个块需要小于 14MB
+    const idealChunkSize = Math.min(Math.ceil(fileSize / 10), 14 * 1024 * 1024);
 
     // 确保块大小至少为512KB
     const minChunkSize = 512 * 1024; // 512KB

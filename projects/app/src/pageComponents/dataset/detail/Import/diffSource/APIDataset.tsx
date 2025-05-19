@@ -9,11 +9,11 @@ import { useRequest2 } from '@fastgpt/web/hooks/useRequest';
 import { getApiDatasetFileList, getApiDatasetFileListExistId } from '@/web/core/dataset/api';
 import MyIcon from '@fastgpt/web/components/common/Icon';
 import { useTranslation } from 'next-i18next';
-import { ParentTreePathItemType } from '@fastgpt/global/common/parentFolder/type';
+import { type ParentTreePathItemType } from '@fastgpt/global/common/parentFolder/type';
 import FolderPath from '@/components/common/folder/Path';
 import { getSourceNameIcon } from '@fastgpt/global/core/dataset/utils';
 import MyBox from '@fastgpt/web/components/common/MyBox';
-import { APIFileItem } from '@fastgpt/global/core/dataset/apiDataset';
+import { type APIFileItem } from '@fastgpt/global/core/dataset/apiDataset';
 import SearchInput from '@fastgpt/web/components/common/Input/SearchInput';
 import { useMount } from 'ahooks';
 
@@ -162,6 +162,7 @@ const CustomAPIFileInput = () => {
       <Flex flexDirection={'column'} h="full">
         <Flex justifyContent={'space-between'}>
           <FolderPath
+            forbidLastClick
             paths={paths}
             onClick={(parentId) => {
               const index = paths.findIndex((item) => item.parentId === parentId);
@@ -276,7 +277,7 @@ const CustomAPIFileInput = () => {
             {selectFiles.length > 0
               ? `${t('dataset:total_num_files', { total: selectFiles.length })} | `
               : ''}
-            {t('common:common.Next Step')}
+            {t('common:next_step')}
           </Button>
         </Box>
       </Flex>

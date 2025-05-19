@@ -1,7 +1,7 @@
 import type { NodeOutputItemType } from '../../../../chat/type';
 import type { FlowNodeOutputItemType } from '../../../type/io';
-import { FlowNodeInputTypeEnum } from 'core/workflow/node/constant';
-import { WorkflowIOValueTypeEnum } from 'core/workflow/constants';
+import type { FlowNodeInputTypeEnum } from 'core/workflow/node/constant';
+import type { WorkflowIOValueTypeEnum } from 'core/workflow/constants';
 import type { ChatCompletionMessageParam } from '../../../../ai/type';
 
 type InteractiveBasicType = {
@@ -25,6 +25,15 @@ type ChildrenInteractive = InteractiveNodeType & {
   type: 'childrenInteractive';
   params: {
     childrenResponse?: WorkflowInteractiveResponseType;
+  };
+};
+
+type LoopInteractive = InteractiveNodeType & {
+  type: 'loopInteractive';
+  params: {
+    loopResult: any[];
+    childrenResponse: WorkflowInteractiveResponseType;
+    currentIndex: number;
   };
 };
 
@@ -71,5 +80,7 @@ type UserInputInteractive = InteractiveNodeType & {
 export type InteractiveNodeResponseType =
   | UserSelectInteractive
   | UserInputInteractive
-  | ChildrenInteractive;
+  | ChildrenInteractive
+  | LoopInteractive;
+
 export type WorkflowInteractiveResponseType = InteractiveBasicType & InteractiveNodeResponseType;

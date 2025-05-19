@@ -1,4 +1,5 @@
-import { StandSubPlanLevelMapType, SubPlanType } from '../../../support/wallet/sub/type';
+import type { SubPlanType } from '../../../support/wallet/sub/type';
+import { StandSubPlanLevelMapType } from '../../../support/wallet/sub/type';
 import type {
   ChatModelItemType,
   FunctionModelItemType,
@@ -49,6 +50,7 @@ export type FastGPTFeConfigsType = {
   find_password_method?: ['email' | 'phone'];
   bind_notification_method?: ['email' | 'phone'];
   googleClientVerKey?: string;
+  mcpServerProxyEndpoint?: string;
 
   show_emptyChat?: boolean;
   show_appStore?: boolean;
@@ -59,7 +61,14 @@ export type FastGPTFeConfigsType = {
   show_team_chat?: boolean;
   show_compliance_copywriting?: boolean;
   show_aiproxy?: boolean;
+  show_coupon?: boolean;
   concatMd?: string;
+
+  show_dataset_feishu?: boolean;
+  show_dataset_yuque?: boolean;
+  show_publish_feishu?: boolean;
+  show_publish_dingtalk?: boolean;
+  show_publish_offiaccount?: boolean;
 
   concatMd?: string;
   docUrl?: string;
@@ -105,6 +114,12 @@ export type FastGPTFeConfigsType = {
   lafEnv?: string;
   navbarItems?: NavbarItemType[];
   externalProviderWorkflowVariables?: ExternalProviderWorkflowVarType[];
+
+  payConfig?: {
+    wx?: boolean;
+    alipay?: boolean;
+    bank?: boolean;
+  };
 };
 
 export type SystemEnvType = {

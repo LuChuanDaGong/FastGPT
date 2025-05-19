@@ -28,7 +28,7 @@ import MyTextarea from '@/components/common/Textarea/MyTextarea';
 import { defaultDatasetMaxTokens } from '@fastgpt/global/core/app/constants';
 import InputSlider from '@fastgpt/web/components/common/MySlider/InputSlider';
 import LeftRadio from '@fastgpt/web/components/common/Radio/LeftRadio';
-import { AppDatasetSearchParamsType } from '@fastgpt/global/core/app/type';
+import { type AppDatasetSearchParamsType } from '@fastgpt/global/core/app/type';
 import MyIcon from '@fastgpt/web/components/common/Icon';
 
 enum SearchSettingTabEnum {
@@ -78,7 +78,7 @@ const DatasetParamsModal = ({
       defaultValues: {
         searchMode,
         embeddingWeight: embeddingWeight || 0.5,
-        usingReRank: !!usingReRank && teamPlanStatus?.standardConstants?.permissionReRank !== false,
+        usingReRank: !!usingReRank,
         rerankModel: rerankModel || defaultModels?.rerank?.model,
         rerankWeight: rerankWeight || 0.5,
         limit,
@@ -246,11 +246,6 @@ const DatasetParamsModal = ({
                   <Box color={'myGray.500'} fontSize={'sm'}>
                     {t('common:core.ai.Not deploy rerank model')}
                   </Box>
-                ) : teamPlanStatus?.standardConstants &&
-                  !teamPlanStatus?.standardConstants?.permissionReRank ? (
-                  <Box color={'myGray.500'} fontSize={'sm'}>
-                    {t('common:support.team.limit.No permission rerank')}
-                  </Box>
                 ) : (
                   <Switch {...register('usingReRank')} />
                 )}
@@ -398,7 +393,7 @@ const DatasetParamsModal = ({
       </ModalBody>
       <ModalFooter>
         <Button variant={'whiteBase'} mr={3} onClick={onClose}>
-          {t('common:common.Close')}
+          {t('common:Close')}
         </Button>
         <Button
           onClick={() => {
@@ -406,7 +401,7 @@ const DatasetParamsModal = ({
             handleSubmit(onSuccess)();
           }}
         >
-          {t('common:common.Done')}
+          {t('common:Done')}
         </Button>
       </ModalFooter>
     </MyModal>

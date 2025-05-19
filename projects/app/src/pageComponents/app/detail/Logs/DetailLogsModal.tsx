@@ -44,7 +44,7 @@ const DetailLogsModal = ({ appId, chatId, onClose }: Props) => {
   const chatRecords = useContextSelector(ChatRecordContext, (v) => v.chatRecords);
   const totalRecordsCount = useContextSelector(ChatRecordContext, (v) => v.totalRecordsCount);
 
-  const { data: chat, loading: isFetching } = useRequest2(
+  const { data: chat } = useRequest2(
     async () => {
       const res = await getInitChatInfo({ appId, chatId, loadCustomFeedbacks: true });
       res.userAvatar = HUMAN_ICON;
@@ -73,7 +73,6 @@ const DetailLogsModal = ({ appId, chatId, onClose }: Props) => {
   return (
     <>
       <MyBox
-        isLoading={isFetching}
         display={'flex'}
         flexDirection={'column'}
         zIndex={3}
@@ -101,11 +100,11 @@ const DetailLogsModal = ({ appId, chatId, onClose }: Props) => {
           >
             <LightRowTabs<PluginRunBoxTabEnum>
               list={[
-                { label: t('common:common.Input'), value: PluginRunBoxTabEnum.input },
+                { label: t('common:Input'), value: PluginRunBoxTabEnum.input },
                 ...(chatRecords.length > 0
                   ? [
-                      { label: t('common:common.Output'), value: PluginRunBoxTabEnum.output },
-                      { label: t('common:common.all_result'), value: PluginRunBoxTabEnum.detail }
+                      { label: t('common:Output'), value: PluginRunBoxTabEnum.output },
+                      { label: t('common:all_result'), value: PluginRunBoxTabEnum.detail }
                     ]
                   : [])
               ]}
@@ -214,6 +213,7 @@ const Render = (props: Props) => {
       showRouteToAppDetail={true}
       showRouteToDatasetDetail={true}
       isShowReadRawSource={true}
+      isResponseDetail={true}
       // isShowFullText={true}
       showNodeStatus
     >

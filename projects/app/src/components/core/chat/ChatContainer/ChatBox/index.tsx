@@ -35,7 +35,7 @@ import type { ChatBoxInputType, ChatBoxInputFormType, SendPromptFnType } from '.
 import type { StartChatFnProps, generatingMessageProps } from '../type';
 import ChatInput from './Input/ChatInput';
 import ChatBoxDivider from '../../Divider';
-import { OutLinkChatAuthProps } from '@fastgpt/global/support/permission/chat';
+import { type OutLinkChatAuthProps } from '@fastgpt/global/support/permission/chat';
 import { getNanoid } from '@fastgpt/global/common/string/tools';
 import {
   ChatItemValueTypeEnum,
@@ -49,7 +49,7 @@ import {
 } from './utils';
 import { textareaMinH } from './constants';
 import { SseResponseEventEnum } from '@fastgpt/global/core/workflow/runtime/constants';
-import ChatProvider, { ChatBoxContext, ChatProviderProps } from './Provider';
+import ChatProvider, { ChatBoxContext, type ChatProviderProps } from './Provider';
 
 import ChatItem from './components/ChatItem';
 
@@ -66,6 +66,7 @@ import { ChatItemContext } from '@/web/core/chat/context/chatItemContext';
 import TimeBox from './components/TimeBox';
 import MyBox from '@fastgpt/web/components/common/MyBox';
 import { VariableInputEnum } from '@fastgpt/global/core/workflow/constants';
+import { valueTypeFormat } from '@fastgpt/global/core/workflow/runtime/utils';
 
 const ResponseTags = dynamic(() => import('./components/ResponseTags'));
 const FeedbackModal = dynamic(() => import('./components/FeedbackModal'));
@@ -220,7 +221,8 @@ const ChatBox = ({
       interactive,
       autoTTSResponse,
       variables,
-      nodeResponse
+      nodeResponse,
+      durationSeconds
     }: generatingMessageProps & { autoTTSResponse?: boolean }) => {
       setChatRecords((state) =>
         state.map((item, index) => {
@@ -341,6 +343,13 @@ const ChatBox = ({
               ...item,
               value: item.value.concat(val)
             };
+          } else if (event === SseResponseEventEnum.workflowDuration && durationSeconds) {
+            return {
+              ...item,
+              durationSeconds: item.durationSeconds
+                ? +(item.durationSeconds + durationSeconds).toFixed(2)
+                : durationSeconds
+            };
           }
 
           return item;
@@ -440,12 +449,13 @@ const ChatBox = ({
           // Only declared variables are kept
           const requestVariables: Record<string, any> = {};
           allVariableList?.forEach((item) => {
-            requestVariables[item.key] =
+            const val =
               variables[item.key] === '' ||
               variables[item.key] === undefined ||
               variables[item.key] === null
                 ? item.defaultValue
                 : variables[item.key];
+            requestVariables[item.key] = valueTypeFormat(val, item.valueType);
           });
 
           const responseChatId = getNanoid(24);
@@ -831,7 +841,7 @@ const ChatBox = ({
 
     return {
       status: chatContent.status || ChatStatusEnum.loading,
-      name: t(chatContent.moduleName || ('' as any)) || t('common:common.Loading')
+      name: t(chatContent.moduleName || ('' as any)) || t('common:Loading')
     };
   }, [chatRecords, isChatting, t]);
 

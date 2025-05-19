@@ -60,14 +60,14 @@ const FastLogin = ({
         }, 1000);
       }
     },
-    [loginSuccess, router, toast]
+    [loginSuccess, router, t, toast]
   );
 
   useEffect(() => {
     clearToken();
     router.prefetch(callbackUrl);
     authCode(code, token);
-  }, []);
+  }, [authCode, callbackUrl, code, router, token]);
 
   return <Loading />;
 };
@@ -77,7 +77,7 @@ export async function getServerSideProps(content: any) {
     props: {
       code: content?.query?.code || '',
       token: content?.query?.token || '',
-      callbackUrl: content?.query?.callbackUrl || '/app/list',
+      callbackUrl: content?.query?.callbackUrl || '/dashboard/apps',
       ...(await serviceSideProps(content))
     }
   };

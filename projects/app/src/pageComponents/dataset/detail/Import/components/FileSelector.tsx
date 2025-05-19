@@ -1,21 +1,21 @@
 import MyBox from '@fastgpt/web/components/common/MyBox';
 import { useSelectFile } from '@/web/common/file/hooks/useSelectFile';
 import { useToast } from '@fastgpt/web/hooks/useToast';
-import { Box, FlexProps } from '@chakra-ui/react';
+import { Box, type FlexProps } from '@chakra-ui/react';
 import { formatFileSize } from '@fastgpt/global/common/file/tools';
 import MyIcon from '@fastgpt/web/components/common/Icon';
 import { useTranslation } from 'next-i18next';
-import React, { DragEvent, useCallback, useMemo, useState } from 'react';
+import React, { type DragEvent, useCallback, useMemo, useState } from 'react';
 import { getNanoid } from '@fastgpt/global/common/string/tools';
 import { useRequest2 } from '@fastgpt/web/hooks/useRequest';
 import { getFileIcon } from '@fastgpt/global/common/file/icon';
 import { useSystemStore } from '@/web/common/system/useSystemStore';
 import { uploadFile2DB } from '@/web/common/file/controller';
 import { BucketNameEnum } from '@fastgpt/global/common/file/constants';
-import { ImportSourceItemType } from '@/web/core/dataset/type';
-import { useI18n } from '@/web/context/I18n';
+import type { ImportSourceItemType } from '@/web/core/dataset/type';
 import { useContextSelector } from 'use-context-selector';
 import { DatasetPageContext } from '@/web/core/dataset/context/datasetPageContext';
+import { getErrText } from '@fastgpt/global/common/error/utils';
 
 export type SelectFileItemType = {
   fileId: string;
@@ -38,7 +38,6 @@ const FileSelector = ({
   onFinishSelect: () => void;
 } & FlexProps) => {
   const { t } = useTranslation();
-  const { fileT } = useI18n();
 
   const { toast } = useToast();
   const { feConfigs } = useSystemStore();
@@ -71,39 +70,53 @@ const FileSelector = ({
       {
         await Promise.all(
           files.map(async ({ fileId, file }) => {
-            const { fileId: uploadFileId } = await uploadFile2DB({
-              file,
-              bucketName: BucketNameEnum.dataset,
-              data: {
-                datasetId
-              },
-              percentListen: (e) => {
-                setSelectFiles((state) =>
-                  state.map((item) =>
-                    item.id === fileId
-                      ? {
-                          ...item,
-                          uploadedFileRate: item.uploadedFileRate
-                            ? Math.max(e, item.uploadedFileRate)
-                            : e
-                        }
-                      : item
-                  )
-                );
-              }
-            });
-            setSelectFiles((state) =>
-              state.map((item) =>
-                item.id === fileId
-                  ? {
-                      ...item,
-                      dbFileId: uploadFileId,
-                      isUploading: false,
-                      uploadedFileRate: 100
-                    }
-                  : item
-              )
-            );
+            try {
+              const { fileId: uploadFileId } = await uploadFile2DB({
+                file,
+                bucketName: BucketNameEnum.dataset,
+                data: {
+                  datasetId
+                },
+                percentListen: (e) => {
+                  setSelectFiles((state) =>
+                    state.map((item) =>
+                      item.id === fileId
+                        ? {
+                            ...item,
+                            uploadedFileRate: item.uploadedFileRate
+                              ? Math.max(e, item.uploadedFileRate)
+                              : e
+                          }
+                        : item
+                    )
+                  );
+                }
+              });
+              setSelectFiles((state) =>
+                state.map((item) =>
+                  item.id === fileId
+                    ? {
+                        ...item,
+                        dbFileId: uploadFileId,
+                        isUploading: false,
+                        uploadedFileRate: 100
+                      }
+                    : item
+                )
+              );
+            } catch (error) {
+              setSelectFiles((state) =>
+                state.map((item) =>
+                  item.id === fileId
+                    ? {
+                        ...item,
+                        isUploading: false,
+                        errorMsg: getErrText(error)
+                      }
+                    : item
+                )
+              );
+            }
           })
         );
       }
@@ -142,7 +155,7 @@ const FileSelector = ({
         files = files.slice(0, maxCount - selectFiles.length);
         toast({
           status: 'warning',
-          title: fileT('some_file_count_exceeds_limit', { maxCount })
+          title: t('file:some_file_count_exceeds_limit', { maxCount })
         });
       }
       // size check
@@ -154,13 +167,13 @@ const FileSelector = ({
       if (filterFiles.length < files.length) {
         toast({
           status: 'warning',
-          title: fileT('some_file_size_exceeds_limit', { maxSize: formatFileSize(maxSize) })
+          title: t('file:some_file_size_exceeds_limit', { maxSize: formatFileSize(maxSize) })
         });
       }
 
       return onSelectFile(filterFiles);
     },
-    [fileT, maxCount, maxSize, onSelectFile, selectFiles.length, toast]
+    [t, maxCount, maxSize, onSelectFile, selectFiles.length, toast]
   );
 
   const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
@@ -255,7 +268,7 @@ const FileSelector = ({
       );
     } else {
       return toast({
-        title: fileT('upload_error_description'),
+        title: t('file:upload_error_description'),
         status: 'error'
       });
     }
@@ -303,18 +316,18 @@ const FileSelector = ({
         <>
           <Box fontWeight={'bold'}>
             {isDragging
-              ? fileT('release_the_mouse_to_upload_the_file')
-              : fileT('select_and_drag_file_tip')}
+              ? t('file:release_the_mouse_to_upload_the_file')
+              : t('file:select_and_drag_file_tip')}
           </Box>
           {/* file type */}
           <Box color={'myGray.500'} fontSize={'xs'}>
-            {fileT('support_file_type', { fileType })}
+            {t('file:support_file_type', { fileType })}
           </Box>
           <Box color={'myGray.500'} fontSize={'xs'}>
             {/* max count */}
-            {maxCount && fileT('support_max_count', { maxCount })}
+            {maxCount && t('file:support_max_count', { maxCount })}
             {/* max size */}
-            {maxSize && fileT('support_max_size', { maxSize: formatFileSize(maxSize) })}
+            {maxSize && t('file:support_max_size', { maxSize: formatFileSize(maxSize) })}
           </Box>
 
           <File

@@ -31,7 +31,7 @@ import {
   getLastInteractiveValue,
   getMaxHistoryLimitFromNodes,
   getWorkflowEntryNodeIds,
-  initWorkflowEdgeStatus,
+  storeEdges2RuntimeEdges,
   rewriteNodeOutputByHistories,
   storeNodes2RuntimeNodes,
   textAdaptGptResponse
@@ -43,7 +43,11 @@ import { getPluginInputsFromStoreNodes } from '@fastgpt/global/core/app/plugin/u
 import { getChatItems } from '@fastgpt/service/core/chat/controller';
 import { MongoChat } from '@fastgpt/service/core/chat/chatSchema';
 import { getSystemTime } from '@fastgpt/global/common/time/timezone';
-import { ChatRoleEnum, ChatSourceEnum } from '@fastgpt/global/core/chat/constants';
+import {
+  ChatItemValueTypeEnum,
+  ChatRoleEnum,
+  ChatSourceEnum
+} from '@fastgpt/global/core/chat/constants';
 import { saveChat, updateInteractiveChat } from '@fastgpt/service/core/chat/saveChat';
 
 export type Props = {
@@ -59,14 +63,6 @@ export type Props = {
 };
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  res.on('close', () => {
-    res.end();
-  });
-  res.on('error', () => {
-    console.log('error: ', 'request error');
-    res.end();
-  });
-
   let {
     nodes = [],
     edges = [],
@@ -97,6 +93,7 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
     const isPlugin = app.type === AppTypeEnum.plugin;
+    const isTool = app.type === AppTypeEnum.tool;
 
     const userQuestion: UserChatItemType = await (async () => {
       if (isPlugin) {
@@ -105,6 +102,17 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
           variables,
           files: variables.files
         });
+      }
+      if (isTool) {
+        return {
+          obj: ChatRoleEnum.Human,
+          value: [
+            {
+              type: ChatItemValueTypeEnum.text,
+              text: { content: 'tool test' }
+            }
+          ]
+        };
       }
 
       const latestHumanChat = chatMessages.pop() as UserChatItemType;
@@ -154,39 +162,40 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
     });
 
     /* start process */
-    const { flowResponses, assistantResponses, newVariables, flowUsages } = await dispatchWorkFlow({
-      res,
-      requestOrigin: req.headers.origin,
-      mode: 'test',
-      timezone,
-      externalProvider,
-      uid: tmbId,
+    const { flowResponses, assistantResponses, newVariables, flowUsages, durationSeconds } =
+      await dispatchWorkFlow({
+        res,
+        requestOrigin: req.headers.origin,
+        mode: 'test',
+        timezone,
+        externalProvider,
+        uid: tmbId,
 
-      runningAppInfo: {
-        id: appId,
-        teamId: app.teamId,
-        tmbId: app.tmbId
-      },
-      runningUserInfo: {
-        teamId,
-        tmbId
-      },
+        runningAppInfo: {
+          id: appId,
+          teamId: app.teamId,
+          tmbId: app.tmbId
+        },
+        runningUserInfo: {
+          teamId,
+          tmbId
+        },
 
-      chatId,
-      responseChatItemId,
-      runtimeNodes,
-      runtimeEdges: initWorkflowEdgeStatus(edges, interactive),
-      variables,
-      query: removeEmptyUserInput(userQuestion.value),
-      lastInteractive: interactive,
-      chatConfig,
-      histories: newHistories,
-      stream: true,
-      maxRunTimes: WORKFLOW_MAX_RUN_TIMES,
-      workflowStreamResponse: workflowResponseWrite,
-      version: 'v2',
-      responseDetail: true
-    });
+        chatId,
+        responseChatItemId,
+        runtimeNodes,
+        runtimeEdges: storeEdges2RuntimeEdges(edges, interactive),
+        variables,
+        query: removeEmptyUserInput(userQuestion.value),
+        lastInteractive: interactive,
+        chatConfig,
+        histories: newHistories,
+        stream: true,
+        maxRunTimes: WORKFLOW_MAX_RUN_TIMES,
+        workflowStreamResponse: workflowResponseWrite,
+        version: 'v2',
+        responseDetail: true
+      });
 
     workflowResponseWrite({
       event: SseResponseEventEnum.answer,
@@ -222,7 +231,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         appId: app._id,
         userInteractiveVal,
         aiResponse,
-        newVariables
+        newVariables,
+        durationSeconds
       });
     } else {
       await saveChat({
@@ -236,7 +246,8 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
         isUpdateUseTime: false, // owner update use time
         newTitle,
         source: ChatSourceEnum.test,
-        content: [userQuestion, aiResponse]
+        content: [userQuestion, aiResponse],
+        durationSeconds
       });
     }
 

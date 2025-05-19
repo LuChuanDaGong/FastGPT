@@ -1,4 +1,4 @@
-import { AppSchema } from '@fastgpt/global/core/app/type';
+import { type AppSchema } from '@fastgpt/global/core/app/type';
 import { NodeInputKeyEnum } from '@fastgpt/global/core/workflow/constants';
 import { FlowNodeTypeEnum } from '@fastgpt/global/core/workflow/node/constant';
 import { getLLMModel } from '../ai/model';
@@ -86,3 +86,19 @@ export async function findAppAndAllChildren({
 
   return [app, ...childDatasets];
 }
+
+export const getAppBasicInfoByIds = async ({ teamId, ids }: { teamId: string; ids: string[] }) => {
+  const apps = await MongoApp.find(
+    {
+      teamId,
+      _id: { $in: ids }
+    },
+    '_id name avatar'
+  ).lean();
+
+  return apps.map((item) => ({
+    id: item._id,
+    name: item.name,
+    avatar: item.avatar
+  }));
+};

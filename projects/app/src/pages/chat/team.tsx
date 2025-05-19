@@ -18,7 +18,7 @@ import SliderApps from '@/pageComponents/chat/SliderApps';
 import { GPTMessages2Chats } from '@fastgpt/global/core/chat/adapt';
 import { useRequest2 } from '@fastgpt/web/hooks/useRequest';
 import ChatContextProvider, { ChatContext } from '@/web/core/chat/context/chatContext';
-import { AppListItemType } from '@fastgpt/global/core/app/type';
+import { type AppListItemType } from '@fastgpt/global/core/app/type';
 import { useContextSelector } from 'use-context-selector';
 import { GetChatTypeEnum } from '@/global/core/chat/constants';
 import { AppTypeEnum } from '@fastgpt/global/core/app/constants';
@@ -314,6 +314,7 @@ const Render = (props: Props) => {
         showRouteToAppDetail={false}
         showRouteToDatasetDetail={false}
         isShowReadRawSource={true}
+        isResponseDetail={true}
         // isShowFullText={true}
         showNodeStatus
       >

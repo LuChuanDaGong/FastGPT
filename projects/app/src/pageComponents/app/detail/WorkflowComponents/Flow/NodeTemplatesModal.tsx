@@ -19,12 +19,15 @@ import type {
   NodeTemplateListItemType,
   NodeTemplateListType
 } from '@fastgpt/global/core/workflow/type/node.d';
-import { useReactFlow, XYPosition } from 'reactflow';
+import { useReactFlow, type XYPosition } from 'reactflow';
 import { useSystemStore } from '@/web/common/system/useSystemStore';
 import { nodeTemplate2FlowNode } from '@/web/core/workflow/utils';
 import { useTranslation } from 'next-i18next';
 import EmptyTip from '@fastgpt/web/components/common/EmptyTip';
-import { FlowNodeTypeEnum } from '@fastgpt/global/core/workflow/node/constant';
+import {
+  AppNodeFlowNodeTypeMap,
+  FlowNodeTypeEnum
+} from '@fastgpt/global/core/workflow/node/constant';
 import {
   getPreviewPluginNode,
   getSystemPlugTemplates,
@@ -42,7 +45,7 @@ import MyTooltip from '@fastgpt/web/components/common/MyTooltip';
 import { useContextSelector } from 'use-context-selector';
 import { WorkflowContext } from '../context';
 import { getTeamPlugTemplates } from '@/web/core/app/api/plugin';
-import { ParentIdType } from '@fastgpt/global/common/parentFolder/type';
+import { type ParentIdType } from '@fastgpt/global/common/parentFolder/type';
 import MyBox from '@fastgpt/web/components/common/MyBox';
 import FolderPath from '@/components/common/folder/Path';
 import { getAppFolderPath } from '@/web/core/app/api/app';
@@ -72,6 +75,7 @@ type RenderHeaderProps = {
   onUpdateParentId: (parentId: ParentIdType) => void;
 };
 type RenderListProps = {
+  templateType: TemplateTypeEnum;
   templates: NodeTemplateListItemType[];
   type: TemplateTypeEnum;
   onClose: () => void;
@@ -247,6 +251,7 @@ const NodeTemplatesModal = ({ isOpen, onClose }: ModuleTemplateListProps) => {
           setSearchKey={setSearchKey}
         />
         <RenderList
+          templateType={templateType}
           templates={templates}
           type={templateType}
           onClose={onClose}
@@ -364,7 +369,7 @@ const RenderHeader = React.memo(function RenderHeader({
                 color: 'primary.600'
               }}
               fontSize={'sm'}
-              onClick={() => router.push('/app/list')}
+              onClick={() => router.push('/dashboard/apps')}
               gap={1}
             >
               <Box>{t('common:create')}</Box>
@@ -402,6 +407,7 @@ const RenderHeader = React.memo(function RenderHeader({
 });
 
 const RenderList = React.memo(function RenderList({
+  templateType,
   templates,
   type,
   onClose,
@@ -472,10 +478,7 @@ const RenderList = React.memo(function RenderList({
       const templateNode = await (async () => {
         try {
           // get plugin preview module
-          if (
-            template.flowNodeType === FlowNodeTypeEnum.pluginModule ||
-            template.flowNodeType === FlowNodeTypeEnum.appModule
-          ) {
+          if (AppNodeFlowNodeTypeMap[template.flowNodeType]) {
             setLoading(true);
             const res = await getPreviewPluginNode({ appId: template.id });
 
@@ -529,21 +532,25 @@ const RenderList = React.memo(function RenderList({
             pluginId: templateNode.pluginId
           }),
           intro: t(templateNode.intro as any),
-          inputs: templateNode.inputs.map((input) => ({
-            ...input,
-            value: defaultValueMap[input.key] ?? input.value,
-            valueDesc: t(input.valueDesc as any),
-            label: t(input.label as any),
-            description: t(input.description as any),
-            debugLabel: t(input.debugLabel as any),
-            toolDescription: t(input.toolDescription as any)
-          })),
-          outputs: templateNode.outputs.map((output) => ({
-            ...output,
-            valueDesc: t(output.valueDesc as any),
-            label: t(output.label as any),
-            description: t(output.description as any)
-          }))
+          inputs: templateNode.inputs
+            .filter((input) => input.deprecated !== true)
+            .map((input) => ({
+              ...input,
+              value: defaultValueMap[input.key] ?? input.value,
+              valueDesc: t(input.valueDesc as any),
+              label: t(input.label as any),
+              description: t(input.description as any),
+              debugLabel: t(input.debugLabel as any),
+              toolDescription: t(input.toolDescription as any)
+            })),
+          outputs: templateNode.outputs
+            .filter((output) => output.deprecated !== true)
+            .map((output) => ({
+              ...output,
+              valueDesc: t(output.valueDesc as any),
+              label: t(output.label as any),
+              description: t(output.description as any)
+            }))
         },
         position: { x: mouseX, y: mouseY },
         selected: true,
@@ -614,11 +621,9 @@ const RenderList = React.memo(function RenderList({
                 }
               })}
             >
-              <Flex>
-                <Box fontSize={'sm'} my={2} fontWeight={'500'} flex={1} color={'myGray.900'}>
-                  {t(item.label as any)}
-                </Box>
-              </Flex>
+              <Box fontSize={'sm'} my={2} fontWeight={'500'} flex={1} color={'myGray.900'}>
+                {t(item.label as any)}
+              </Box>
               <Grid gridTemplateColumns={gridStyle.gridTemplateColumns} rowGap={2}>
                 {item.list.map((template) => {
                   return (
@@ -655,9 +660,16 @@ const RenderList = React.memo(function RenderList({
                         py={gridStyle.py}
                         px={3}
                         cursor={'pointer'}
-                        _hover={{ bg: 'myWhite.600' }}
+                        _hover={{
+                          bg: 'myWhite.600',
+                          '& .arrowIcon': {
+                            display: 'block'
+                          }
+                        }}
                         borderRadius={'sm'}
-                        draggable={!template.isFolder}
+                        draggable={
+                          !template.isFolder || template.flowNodeType === FlowNodeTypeEnum.toolSet
+                        }
                         onDragEnd={(e) => {
                           if (e.clientX < sliderWidth) return;
                           onAddNode({
@@ -666,7 +678,10 @@ const RenderList = React.memo(function RenderList({
                           });
                         }}
                         onClick={(e) => {
-                          if (template.isFolder) {
+                          if (
+                            template.isFolder &&
+                            template.flowNodeType !== FlowNodeTypeEnum.toolSet
+                          ) {
                             return setParentId(template.id);
                           }
                           if (isPc) {
@@ -702,6 +717,26 @@ const RenderList = React.memo(function RenderList({
                         >
                           {t(template.name as any)}
                         </Box>
+
+                        {template.isFolder && templateType === TemplateTypeEnum.teamPlugin && (
+                          <Box
+                            color={'myGray.500'}
+                            _hover={{
+                              bg: 'var(--light-general-surface-opacity-005, rgba(17, 24, 36, 0.05))',
+                              color: 'primary.600'
+                            }}
+                            p={1}
+                            rounded={'sm'}
+                            className="arrowIcon"
+                            display="none"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              return setParentId(template.id);
+                            }}
+                          >
+                            <MyIcon name="common/arrowRight" w={'24px'} />
+                          </Box>
+                        )}
 
                         {gridStyle.authorInRight && template.authorAvatar && template.author && (
                           <HStack spacing={1} maxW={'120px'} flexShrink={0}>

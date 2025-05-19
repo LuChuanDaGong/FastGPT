@@ -1,16 +1,19 @@
 import { MongoDatasetData } from '@fastgpt/service/core/dataset/data/schema';
 import {
-  CreateDatasetDataProps,
-  PatchIndexesProps,
-  UpdateDatasetDataProps
+  type CreateDatasetDataProps,
+  type PatchIndexesProps,
+  type UpdateDatasetDataProps
 } from '@fastgpt/global/core/dataset/controller';
-import { insertDatasetDataVector } from '@fastgpt/service/common/vectorStore/controller';
+import { insertDatasetDataVector } from '@fastgpt/service/common/vectorDB/controller';
 import { jiebaSplit } from '@fastgpt/service/common/string/jieba/index';
-import { deleteDatasetDataVector } from '@fastgpt/service/common/vectorStore/controller';
-import { DatasetDataIndexItemType, DatasetDataItemType } from '@fastgpt/global/core/dataset/type';
+import { deleteDatasetDataVector } from '@fastgpt/service/common/vectorDB/controller';
+import {
+  type DatasetDataIndexItemType,
+  type DatasetDataItemType
+} from '@fastgpt/global/core/dataset/type';
 import { getEmbeddingModel, getLLMModel } from '@fastgpt/service/core/ai/model';
 import { mongoSessionRun } from '@fastgpt/service/common/mongo/sessionRun';
-import { ClientSession } from '@fastgpt/service/common/mongo';
+import { type ClientSession } from '@fastgpt/service/common/mongo';
 import { MongoDatasetDataText } from '@fastgpt/service/core/dataset/data/dataTextSchema';
 import { DatasetDataIndexTypeEnum } from '@fastgpt/global/core/dataset/data/constants';
 import { splitText2Chunks } from '@fastgpt/global/common/string/textSplitter';
@@ -77,6 +80,7 @@ const formatIndexes = async ({
 
   // Recompute default indexes, Merge ids of the same index, reduce the number of rebuilds
   const defaultIndexes = getDefaultIndex({ q, a, indexSize });
+
   const concatDefaultIndexes = defaultIndexes.map((item) => {
     const oldIndex = indexes!.find((index) => index.text === item.text);
     if (oldIndex) {

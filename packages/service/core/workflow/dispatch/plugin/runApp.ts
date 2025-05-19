@@ -5,20 +5,21 @@ import { ChatRoleEnum } from '@fastgpt/global/core/chat/constants';
 import { SseResponseEventEnum } from '@fastgpt/global/core/workflow/runtime/constants';
 import {
   getWorkflowEntryNodeIds,
-  initWorkflowEdgeStatus,
+  storeEdges2RuntimeEdges,
+  rewriteNodeOutputByHistories,
   storeNodes2RuntimeNodes,
   textAdaptGptResponse
 } from '@fastgpt/global/core/workflow/runtime/utils';
-import { NodeInputKeyEnum, NodeOutputKeyEnum } from '@fastgpt/global/core/workflow/constants';
+import type { NodeInputKeyEnum, NodeOutputKeyEnum } from '@fastgpt/global/core/workflow/constants';
 import { DispatchNodeResponseKeyEnum } from '@fastgpt/global/core/workflow/runtime/constants';
 import { filterSystemVariables, getHistories } from '../utils';
 import { chatValue2RuntimePrompt, runtimePrompt2ChatsValue } from '@fastgpt/global/core/chat/adapt';
-import { DispatchNodeResultType } from '@fastgpt/global/core/workflow/runtime/type';
+import { type DispatchNodeResultType } from '@fastgpt/global/core/workflow/runtime/type';
 import { authAppByTmbId } from '../../../../support/permission/app/auth';
 import { ReadPermissionVal } from '@fastgpt/global/support/permission/constant';
 import { getAppVersionById } from '../../../app/version/controller';
 import { parseUrlToFileType } from '@fastgpt/global/common/file/tools';
-import { ChildrenInteractive } from '@fastgpt/global/core/workflow/template/system/interactive/type';
+import { type ChildrenInteractive } from '@fastgpt/global/core/workflow/template/system/interactive/type';
 
 type Props = ModuleDispatchProps<{
   [NodeInputKeyEnum.userChatInput]: string;
@@ -107,9 +108,15 @@ export const dispatchRunAppNode = async (props: Props): Promise<Response> => {
     lastInteractive?.type === 'childrenInteractive'
       ? lastInteractive.params.childrenResponse
       : undefined;
-  const entryNodeIds = getWorkflowEntryNodeIds(nodes, childrenInteractive || undefined);
-  const runtimeNodes = storeNodes2RuntimeNodes(nodes, entryNodeIds);
-  const runtimeEdges = initWorkflowEdgeStatus(edges, childrenInteractive);
+  const runtimeNodes = rewriteNodeOutputByHistories(
+    storeNodes2RuntimeNodes(
+      nodes,
+      getWorkflowEntryNodeIds(nodes, childrenInteractive || undefined)
+    ),
+    childrenInteractive
+  );
+
+  const runtimeEdges = storeEdges2RuntimeEdges(edges, childrenInteractive);
   const theQuery = childrenInteractive
     ? query
     : runtimePrompt2ChatsValue({ files: userInputFiles, text: userChatInput });
@@ -170,7 +177,8 @@ export const dispatchRunAppNode = async (props: Props): Promise<Response> => {
       totalPoints: usagePoints,
       query: userChatInput,
       textOutput: text,
-      pluginDetail: appData.permission.hasWritePer ? flowResponses : undefined
+      pluginDetail: appData.permission.hasWritePer ? flowResponses : undefined,
+      mergeSignId: props.node.nodeId
     },
     [DispatchNodeResponseKeyEnum.nodeDispatchUsages]: [
       {

@@ -10,7 +10,7 @@ import {
 } from '@fastgpt/global/core/chat/constants';
 import {
   getWorkflowEntryNodeIds,
-  initWorkflowEdgeStatus,
+  storeEdges2RuntimeEdges,
   storeNodes2RuntimeNodes
 } from '@fastgpt/global/core/workflow/runtime/utils';
 import { UsageSourceEnum } from '@fastgpt/global/support/wallet/usage/constants';
@@ -19,7 +19,7 @@ import { MongoApp } from '@fastgpt/service/core/app/schema';
 import { WORKFLOW_MAX_RUN_TIMES } from '@fastgpt/service/core/workflow/constants';
 import { dispatchWorkFlow } from '@fastgpt/service/core/workflow/dispatch';
 import { DispatchNodeResponseKeyEnum } from '@fastgpt/global/core/workflow/runtime/constants';
-import { UserChatItemValueItemType } from '@fastgpt/global/core/chat/type';
+import { type UserChatItemValueItemType } from '@fastgpt/global/core/chat/type';
 import { saveChat } from '@fastgpt/service/core/chat/saveChat';
 import { getAppLatestVersion } from '@fastgpt/service/core/app/version/controller';
 import {
@@ -29,7 +29,10 @@ import {
 import { PluginSourceEnum } from '@fastgpt/global/core/plugin/constants';
 import { authAppByTmbId } from '@fastgpt/service/support/permission/app/auth';
 import { ReadPermissionVal } from '@fastgpt/global/support/permission/constant';
-import { PluginDataType, StoreNodeItemType } from '@fastgpt/global/core/workflow/type/node';
+import {
+  type PluginDataType,
+  type StoreNodeItemType
+} from '@fastgpt/global/core/workflow/type/node';
 
 export const getScheduleTriggerApp = async () => {
   // 1. Find all the app
@@ -62,32 +65,34 @@ export const getScheduleTriggerApp = async () => {
           }
         ];
 
-        const { flowUsages, assistantResponses, flowResponses } = await retryFn(() => {
-          return dispatchWorkFlow({
-            chatId,
-            timezone,
-            externalProvider,
-            mode: 'chat',
-            runningAppInfo: {
-              id: String(app._id),
-              teamId: String(app.teamId),
-              tmbId: String(app.tmbId)
-            },
-            runningUserInfo: {
-              teamId: String(app.teamId),
-              tmbId: String(app.tmbId)
-            },
-            uid: String(app.tmbId),
-            runtimeNodes: storeNodes2RuntimeNodes(nodes, getWorkflowEntryNodeIds(nodes)),
-            runtimeEdges: initWorkflowEdgeStatus(edges),
-            variables: {},
-            query: userQuery,
-            chatConfig,
-            histories: [],
-            stream: false,
-            maxRunTimes: WORKFLOW_MAX_RUN_TIMES
-          });
-        });
+        const { flowUsages, assistantResponses, flowResponses, durationSeconds } = await retryFn(
+          () => {
+            return dispatchWorkFlow({
+              chatId,
+              timezone,
+              externalProvider,
+              mode: 'chat',
+              runningAppInfo: {
+                id: String(app._id),
+                teamId: String(app.teamId),
+                tmbId: String(app.tmbId)
+              },
+              runningUserInfo: {
+                teamId: String(app.teamId),
+                tmbId: String(app.tmbId)
+              },
+              uid: String(app.tmbId),
+              runtimeNodes: storeNodes2RuntimeNodes(nodes, getWorkflowEntryNodeIds(nodes)),
+              runtimeEdges: storeEdges2RuntimeEdges(edges),
+              variables: {},
+              query: userQuery,
+              chatConfig,
+              histories: [],
+              stream: false,
+              maxRunTimes: WORKFLOW_MAX_RUN_TIMES
+            });
+          }
+        );
 
         // Save chat
         await saveChat({
@@ -111,7 +116,8 @@ export const getScheduleTriggerApp = async () => {
               value: assistantResponses,
               [DispatchNodeResponseKeyEnum.nodeResponse]: flowResponses
             }
-          ]
+          ],
+          durationSeconds
         });
         createChatUsage({
           appName: app.name,
@@ -140,8 +146,8 @@ export const checkNode = async ({
 }: {
   node: StoreNodeItemType;
   ownerTmbId: string;
-}) => {
-  const { pluginId } = node;
+}): Promise<StoreNodeItemType> => {
+  const pluginId = node.pluginId;
   if (!pluginId) return node;
 
   try {
@@ -154,7 +160,7 @@ export const checkNode = async ({
       });
     }
 
-    const preview = await getChildAppPreviewNode({ id: pluginId });
+    const preview = await getChildAppPreviewNode({ appId: pluginId });
     return {
       ...node,
       pluginData: {
@@ -169,7 +175,6 @@ export const checkNode = async ({
   } catch (error: any) {
     return {
       ...node,
-      isError: true,
       pluginData: {
         error
       } as PluginDataType

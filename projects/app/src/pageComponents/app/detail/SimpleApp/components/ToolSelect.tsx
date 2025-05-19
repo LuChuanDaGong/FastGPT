@@ -4,12 +4,15 @@ import MyIcon from '@fastgpt/web/components/common/Icon';
 import { useTranslation } from 'next-i18next';
 import QuestionTip from '@fastgpt/web/components/common/MyTooltip/QuestionTip';
 import { SmallAddIcon } from '@chakra-ui/icons';
-import { AppSimpleEditFormType } from '@fastgpt/global/core/app/type';
+import { type AppSimpleEditFormType } from '@fastgpt/global/core/app/type';
 import MyTooltip from '@fastgpt/web/components/common/MyTooltip';
 import { theme } from '@fastgpt/web/styles/theme';
 import DeleteIcon, { hoverDeleteStyles } from '@fastgpt/web/components/common/Icon/delete';
 import ToolSelectModal, { childAppSystemKey } from './ToolSelectModal';
-import { FlowNodeInputTypeEnum } from '@fastgpt/global/core/workflow/node/constant';
+import {
+  FlowNodeInputTypeEnum,
+  FlowNodeTypeEnum
+} from '@fastgpt/global/core/workflow/node/constant';
 import Avatar from '@fastgpt/web/components/common/Avatar';
 import ConfigToolModal from './ConfigToolModal';
 import { getWebLLMModel } from '@/web/common/system/utils';
@@ -53,7 +56,7 @@ const ToolSelect = ({
           fontSize={'sm'}
           onClick={onOpenToolsSelect}
         >
-          {t('common:common.Choose')}
+          {t('common:Choose')}
         </Button>
       </Flex>
       <Grid
@@ -90,7 +93,9 @@ const ToolSelect = ({
                           input.renderTypeList.includes(FlowNodeInputTypeEnum.selectLLMModel) ||
                           input.renderTypeList.includes(FlowNodeInputTypeEnum.fileSelect)
                       ) ||
-                    hasError
+                    hasError ||
+                    item.flowNodeType === FlowNodeTypeEnum.tool ||
+                    item.flowNodeType === FlowNodeTypeEnum.toolSet
                   ) {
                     return;
                   }

@@ -5,10 +5,10 @@ import { DispatchNodeResponseKeyEnum } from '@fastgpt/global/core/workflow/runti
 import { getChildAppRuntimeById } from '../../../app/plugin/controller';
 import {
   getWorkflowEntryNodeIds,
-  initWorkflowEdgeStatus,
+  storeEdges2RuntimeEdges,
   storeNodes2RuntimeNodes
 } from '@fastgpt/global/core/workflow/runtime/utils';
-import { DispatchNodeResultType } from '@fastgpt/global/core/workflow/runtime/type';
+import { type DispatchNodeResultType } from '@fastgpt/global/core/workflow/runtime/type';
 import { authPluginByTmbId } from '../../../../support/permission/app/auth';
 import { ReadPermissionVal } from '@fastgpt/global/support/permission/constant';
 import { computedPluginUsage } from '../../../app/plugin/utils';
@@ -16,7 +16,7 @@ import { filterSystemVariables } from '../utils';
 import { chatValue2RuntimePrompt } from '@fastgpt/global/core/chat/adapt';
 import { getPluginRunUserQuery } from '@fastgpt/global/core/workflow/utils';
 import { getPluginInputsFromStoreNodes } from '@fastgpt/global/core/app/plugin/utils';
-import { NodeInputKeyEnum } from '@fastgpt/global/core/workflow/constants';
+import type { NodeInputKeyEnum } from '@fastgpt/global/core/workflow/constants';
 
 type RunPluginProps = ModuleDispatchProps<{
   [NodeInputKeyEnum.forbidStream]?: boolean;
@@ -101,7 +101,7 @@ export const dispatchRunPlugin = async (props: RunPluginProps): Promise<RunPlugi
     }).value,
     chatConfig: {},
     runtimeNodes,
-    runtimeEdges: initWorkflowEdgeStatus(plugin.edges)
+    runtimeEdges: storeEdges2RuntimeEdges(plugin.edges)
   });
   const output = flowResponses.find((item) => item.moduleType === FlowNodeTypeEnum.pluginOutput);
   if (output) {

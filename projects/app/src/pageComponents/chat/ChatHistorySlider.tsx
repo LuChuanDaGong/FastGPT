@@ -254,7 +254,7 @@ const ChatHistorySlider = ({ confirmClearText }: { confirmClearText: string }) =
                             },
 
                             {
-                              label: t('common:common.Custom Title'),
+                              label: t('common:custom_title'),
                               icon: 'common/customTitleLight',
                               onClick: () => {
                                 onOpenModal({
@@ -268,7 +268,7 @@ const ChatHistorySlider = ({ confirmClearText }: { confirmClearText: string }) =
                               }
                             },
                             {
-                              label: t('common:common.Delete'),
+                              label: t('common:Delete'),
                               icon: 'delete',
                               onClick: () => {
                                 onDelHistory(item.id);
@@ -299,7 +299,7 @@ const ChatHistorySlider = ({ confirmClearText }: { confirmClearText: string }) =
           alignItems={'center'}
           cursor={'pointer'}
           p={3}
-          onClick={() => router.push('/app/list')}
+          onClick={() => router.push('/dashboard/apps')}
         >
           <IconButton
             mr={3}

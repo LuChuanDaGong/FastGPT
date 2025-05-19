@@ -3,9 +3,9 @@ import { FlowNodeTypeEnum } from '../workflow/node/constant';
 import { NodeInputKeyEnum, FlowNodeTemplateTypeEnum } from '../workflow/constants';
 import type { FlowNodeInputItemType } from '../workflow/type/io.d';
 import { getAppChatConfig } from '../workflow/utils';
-import { StoreNodeItemType } from '../workflow/type/node';
+import { type StoreNodeItemType } from '../workflow/type/node';
 import { DatasetSearchModeEnum } from '../dataset/constants';
-import { WorkflowTemplateBasicType } from '../workflow/type';
+import { type WorkflowTemplateBasicType } from '../workflow/type';
 import { AppTypeEnum } from './constants';
 import { AppErrEnum } from '../../common/error/code/app';
 import { PluginErrEnum } from '../../common/error/code/plugin';
@@ -26,7 +26,7 @@ export const getDefaultAppForm = (): AppSimpleEditFormType => {
       similarity: 0.4,
       limit: 3000,
       searchMode: DatasetSearchModeEnum.embedding,
-      usingReRank: false,
+      usingReRank: true,
       rerankModel: '',
       rerankWeight: 0.5,
       datasetSearchUsingExtensionQuery: true,
@@ -140,7 +140,9 @@ export const appWorkflow2Form = ({
       );
     } else if (
       node.flowNodeType === FlowNodeTypeEnum.pluginModule ||
-      node.flowNodeType === FlowNodeTypeEnum.appModule
+      node.flowNodeType === FlowNodeTypeEnum.appModule ||
+      node.flowNodeType === FlowNodeTypeEnum.tool ||
+      node.flowNodeType === FlowNodeTypeEnum.toolSet
     ) {
       if (!node.pluginId) return;
 
