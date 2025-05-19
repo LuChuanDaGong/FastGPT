@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { Readable } from 'stream';
+import type { Readable } from 'stream';
 import { getNanoid } from '@fastgpt/global/common/string/tools';
 
 // 新增 CSV 写入函数
